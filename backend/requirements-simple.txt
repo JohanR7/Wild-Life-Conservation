@@ -1,0 +1,31 @@
+# Simplified requirements for easier installation
+# Install these first if you have issues with the main requirements.txt
+
+# Core web framework
+fastapi
+uvicorn[standard]
+
+# Audio processing
+torch --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+librosa
+soundfile
+
+# Machine learning
+scikit-learn
+joblib
+pandas
+numpy
+
+# Tree-based models
+lightgbm
+xgboost
+
+# Web and file handling
+python-multipart
+websockets
+aiofiles
+
+# Utilities
+tqdm
+pydantic

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Classification Middleware</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            background: #f8f9ff;
+            color: #667eea;
+            font-size: 1.1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-input-button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .file-list {
+            margin-top: 15px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .upload-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .upload-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .upload-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .results-header {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .best-prediction {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .best-prediction h3 {
+            font-size: 1.4em;
+            margin-bottom: 10px;
+        }
+
+        .confidence-bar {
+            background: rgba(255,255,255,0.3);
+            height: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: white;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        .file-results {
+            display: grid;
+            gap: 15px;
+        }
+
+        .file-result {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .file-result.success {
+            border-left-color: #4CAF50;
+        }
+
+        .file-result.error {
+            border-left-color: #f44336;
+        }
+
+        .result-filename {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .predictions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .prediction-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .prediction-item.best {
+            border-color: #4CAF50;
+            background: #f1f8e9;
+        }
+
+        .model-name {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .prediction-text {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .confidence-text {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background-color: #4CAF50;
+        }
+
+        .status-offline {
+            background-color: #f44336;
+        }
+
+        .connection-status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Audio Classification Middleware</h1>
+            <p>Upload up to 5 audio files for gunshot and wildlife classification</p>
+        </div>
+
+        <div class="connection-status" id="connectionStatus">
+            <span class="status-indicator status-offline" id="statusIndicator"></span>
+            <span id="statusText">Checking connection...</span>
+        </div>
+
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" 
+                       id="audioFiles" 
+                       class="file-input" 
+                       multiple 
+                       accept=".wav,.mp3,.flac,.m4a,.ogg"
+                       max="5">
+                <div class="file-input-button">
+                    📁 Choose Audio Files (Max 5 files)
+                </div>
+            </div>
+            
+            <div class="file-list" id="fileList"></div>
+            
+            <button class="upload-button" id="uploadButton" disabled>
+                🚀 Classify Audio Files
+            </button>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-header">Classification Results</div>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let selectedFiles = [];
+        let isConnected = false;
+
+        // DOM elements
+        const fileInput = document.getElementById('audioFiles');
+        const fileList = document.getElementById('fileList');
+        const uploadButton = document.getElementById('uploadButton');
+        const resultsSection = document.getElementById('resultsSection');
+        const results = document.getElementById('results');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        // Check server health on load
+        checkServerHealth();
+
+        // File input change handler
+        fileInput.addEventListener('change', function(e) {
+            selectedFiles = Array.from(e.target.files).slice(0, 5); // Limit to 5 files
+            displayFileList();
+            uploadButton.disabled = selectedFiles.length === 0 || !isConnected;
+        });
+
+        // Upload button click handler
+        uploadButton.addEventListener('click', uploadFiles);
+
+        function checkServerHealth() {
+            fetch(`${API_BASE}/health`)
+                .then(response => response.json())
+                .then(data => {
+                    isConnected = true;
+                    statusIndicator.className = 'status-indicator status-online';
+                    statusText.textContent = `Connected - ${data.models_loaded.gunshot_models + data.models_loaded.wildlife_models} models loaded`;
+                    uploadButton.disabled = selectedFiles.length === 0;
+                })
+                .catch(error => {
+                    isConnected = false;
+                    statusIndicator.className = 'status-indicator status-offline';
+                    statusText.textContent = 'Server offline - Please start the backend server';
+                    uploadButton.disabled = true;
+                });
+        }
+
+        function displayFileList() {
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+
+            const listHTML = selectedFiles.map(file => `
+                <div class="file-item">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+            `).join('');
+
+            fileList.innerHTML = listHTML;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) return;
+
+            uploadButton.disabled = true;
+            uploadButton.textContent = '🔄 Processing...';
+
+            // Show loading
+            resultsSection.style.display = 'block';
+            results.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Processing ${selectedFiles.length} audio file(s)...</p>
+                </div>
+            `;
+
+            try {
+                const formData = new FormData();
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch(`${API_BASE}/upload_audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                results.innerHTML = `
+                    <div class="file-result error">
+                        <div class="result-filename">❌ Error</div>
+                        <p>Failed to process files: ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                uploadButton.disabled = false;
+                uploadButton.textContent = '🚀 Classify Audio Files';
+            }
+        }
+
+        function displayResults(data) {
+            let resultsHTML = '';
+
+            // Show best overall prediction if available
+            if (data.best_overall_prediction) {
+                const best = data.best_overall_prediction;
+                resultsHTML += `
+                    <div class="best-prediction">
+                        <h3>🏆 Best Overall Prediction</h3>
+                        <div><strong>File:</strong> ${best.filename}</div>
+                        <div><strong>Prediction:</strong> ${best.prediction}</div>
+                        <div><strong>Model:</strong> ${best.model}</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${best.confidence * 100}%"></div>
+                        </div>
+                        <div><strong>Confidence:</strong> ${(best.confidence * 100).toFixed(1)}%</div>
+                    </div>
+                `;
+            }
+
+            // Show individual file results
+            resultsHTML += '<div class="file-results">';
+            
+            data.results.forEach(result => {
+                const statusClass = result.success ? 'success' : 'error';
+                
+                resultsHTML += `
+                    <div class="file-result ${statusClass}">
+                        <div class="result-filename">
+                            ${result.success ? '✅' : '❌'} ${result.filename}
+                        </div>
+                `;
+
+                if (result.success && result.classification && result.classification.success) {
+                    const classification = result.classification;
+                    
+                    // Show gunshot predictions
+                    if (Object.keys(classification.gunshot_predictions).length > 0) {
+                        resultsHTML += '<h4>🔫 Gunshot Models:</h4>';
+                        resultsHTML += '<div class="predictions-grid">';
+                        
+                        Object.entries(classification.gunshot_predictions).forEach(([modelName, pred]) => {
+                            const isBest = classification.best_result?.best_model === modelName;
+                            resultsHTML += `
+                                <div class="prediction-item ${isBest ? 'best' : ''}">
+                                    <div class="model-name">${modelName} ${isBest ? '👑' : ''}</div>
+                                    <div class="prediction-text">${pred.prediction}</div>
+                                    <div class="confidence-text">${(pred.confidence * 100).toFixed(1)}%</div>
+                                </div>
+                            `;
+                        });
+                        
+                        resultsHTML += '</div>';
+                    }
+
+                    // Show wildlife predictions
+                    if (Object.keys(classification.wildlife_predictions).length > 0) {
+                        resultsHTML += '<h4>🦎 Wildlife Models:</h4>';
+                        resultsHTML += '<div class="predictions-grid">';
+                        
+                        Object.entries(classification.wildlife_predictions).forEach(([modelName, pred]) => {
+                            const isBest = classification.best_result?.best_model === modelName;
+                            resultsHTML += `
+                                <div class="prediction-item ${isBest ? 'best' : ''}">
+                                    <div class="model-name">${modelName} ${isBest ? '👑' : ''}</div>
+                                    <div class="prediction-text">${pred.prediction}</div>
+                                    <div class="confidence-text">${(pred.confidence * 100).toFixed(1)}%</div>
+                                </div>
+                            `;
+                        });
+                        
+                        resultsHTML += '</div>';
+                    }
+
+                    resultsHTML += `<p><small>Processing time: ${result.processing_time.toFixed(2)}s | Features: ${result.feature_count}</small></p>`;
+                } else {
+                    resultsHTML += `<p>Error: ${result.error}</p>`;
+                }
+
+                resultsHTML += '</div>';
+            });
+
+            resultsHTML += '</div>';
+
+            // Show processing summary
+            if (data.processing_summary) {
+                const summary = data.processing_summary;
+                resultsHTML += `
+                    <div class="file-result">
+                        <div class="result-filename">📊 Processing Summary</div>
+                        <p><strong>Total files:</strong> ${data.total_files}</p>
+                        <p><strong>Successful:</strong> ${summary.successful_files}</p>
+                        <p><strong>Failed:</strong> ${summary.failed_files}</p>
+                        <p><strong>Total processing time:</strong> ${summary.total_processing_time.toFixed(2)}s</p>
+                    </div>
+                `;
+            }
+
+            results.innerHTML = resultsHTML;
+        }
+
+        // Check server health every 30 seconds
+        setInterval(checkServerHealth, 30000);
+    </script>
+</body>
+</html>

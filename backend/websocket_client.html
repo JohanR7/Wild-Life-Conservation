@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Audio Classification</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .status-card.connected {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-card.disconnected {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #1e7e34;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .audio-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            margin-right: 8px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .audio-visualizer {
+            width: 100%;
+            height: 100px;
+            background: #000;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .messages {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .message.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .prediction-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .prediction-card {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .prediction-card.best {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .prediction-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Real-time Audio Classification</h1>
+            <p>Live audio processing with WebSocket connection</p>
+        </div>
+
+        <div class="status-panel">
+            <div class="status-card" id="connectionStatus">
+                <h3>Connection Status</h3>
+                <div id="connectionText">Disconnected</div>
+            </div>
+            <div class="status-card">
+                <h3>Models Loaded</h3>
+                <div id="modelsCount">Checking...</div>
+            </div>
+            <div class="status-card">
+                <h3>Processing Queue</h3>
+                <div id="queueStatus">0 files</div>
+            </div>
+            <div class="status-card">
+                <h3>Last Prediction</h3>
+                <div id="lastPrediction">None</div>
+            </div>
+        </div>
+
+        <div class="audio-controls">
+            <h3>Audio Recording</h3>
+            <div class="controls">
+                <button class="btn btn-success" id="startRecording" disabled>
+                    🎤 Start Recording
+                </button>
+                <button class="btn btn-danger" id="stopRecording" disabled>
+                    ⏹️ Stop Recording
+                </button>
+                <button class="btn btn-primary" id="uploadFile">
+                    📁 Upload File
+                </button>
+            </div>
+            <input type="file" id="fileInput" accept=".wav,.mp3,.flac,.m4a,.ogg" style="display: none;">
+            
+            <div id="recordingStatus" style="display: none;">
+                <span class="recording-indicator"></span>
+                Recording... <span id="recordingTime">00:00</span>
+            </div>
+            
+            <canvas class="audio-visualizer" id="audioVisualizer"></canvas>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="message info">
+                <span class="timestamp">[System]</span>
+                Initializing connection...
+            </div>
+        </div>
+
+        <div class="prediction-display" id="predictionDisplay">
+            <!-- Predictions will appear here -->
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let analyser = null;
+        let recordingStartTime = null;
+        let recordingTimer = null;
+
+        // DOM elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const connectionText = document.getElementById('connectionText');
+        const modelsCount = document.getElementById('modelsCount');
+        const queueStatus = document.getElementById('queueStatus');
+        const lastPrediction = document.getElementById('lastPrediction');
+        const startRecordingBtn = document.getElementById('startRecording');
+        const stopRecordingBtn = document.getElementById('stopRecording');
+        const uploadFileBtn = document.getElementById('uploadFile');
+        const fileInput = document.getElementById('fileInput');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const recordingTime = document.getElementById('recordingTime');
+        const messages = document.getElementById('messages');
+        const predictionDisplay = document.getElementById('predictionDisplay');
+        const audioVisualizer = document.getElementById('audioVisualizer');
+
+        // Initialize
+        init();
+
+        function init() {
+            connectWebSocket();
+            checkServerHealth();
+            setupEventListeners();
+            setupAudioVisualization();
+        }
+
+        function setupEventListeners() {
+            startRecordingBtn.addEventListener('click', startRecording);
+            stopRecordingBtn.addEventListener('click', stopRecording);
+            uploadFileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileUpload);
+        }
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:8000/ws');
+                
+                ws.onopen = function() {
+                    addMessage('WebSocket connected', 'success');
+                    updateConnectionStatus(true);
+                    startRecordingBtn.disabled = false;
+                    
+                    // Send ping to test connection
+                    ws.send(JSON.stringify({type: 'ping'}));
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+                
+                ws.onclose = function() {
+                    addMessage('WebSocket disconnected', 'error');
+                    updateConnectionStatus(false);
+                    startRecordingBtn.disabled = true;
+                    stopRecordingBtn.disabled = true;
+                    
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(connectWebSocket, 3000);
+                };
+                
+                ws.onerror = function(error) {
+                    addMessage(`WebSocket error: ${error}`, 'error');
+                    updateConnectionStatus(false);
+                };
+                
+            } catch (error) {
+                addMessage(`Failed to connect: ${error}`, 'error');
+                updateConnectionStatus(false);
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'pong':
+                    addMessage('Connection verified', 'info');
+                    break;
+                case 'status':
+                    addMessage(data.message, 'info');
+                    break;
+                case 'prediction':
+                    handlePredictionResult(data);
+                    break;
+                case 'error':
+                    addMessage(`Error: ${data.message}`, 'error');
+                    break;
+                default:
+                    console.log('Unknown message type:', data);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                connectionStatus.className = 'status-card connected';
+                connectionText.textContent = 'Connected';
+            } else {
+                connectionStatus.className = 'status-card disconnected';
+                connectionText.textContent = 'Disconnected';
+            }
+        }
+
+        async function checkServerHealth() {
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                
+                const totalModels = data.models_loaded.gunshot_models + data.models_loaded.wildlife_models;
+                modelsCount.textContent = `${totalModels} models`;
+                
+                addMessage(`Server healthy - ${totalModels} models loaded`, 'success');
+            } catch (error) {
+                modelsCount.textContent = 'Error';
+                addMessage('Failed to check server health', 'error');
+            }
+        }
+
+        function setupAudioVisualization() {
+            const canvas = audioVisualizer;
+            const ctx = canvas.getContext('2d');
+            
+            function draw() {
+                if (!analyser) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Audio Visualizer (start recording to see waveform)', canvas.width / 2, canvas.height / 2);
+                    requestAnimationFrame(draw);
+                    return;
+                }
+                
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+                
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    barHeight = (dataArray[i] / 255) * canvas.height;
+                    
+                    const r = barHeight + 25 * (i / bufferLength);
+                    const g = 250 * (i / bufferLength);
+                    const b = 50;
+                    
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                }
+                
+                requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 22050,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                // Setup audio context for visualization
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                
+                mediaRecorder = new MediaRecorder(stream);
+                const audioChunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    uploadAudioBlob(audioBlob);
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStartTime = Date.now();
+                
+                // Update UI
+                startRecordingBtn.disabled = true;
+                stopRecordingBtn.disabled = false;
+                recordingStatus.style.display = 'block';
+                
+                // Start recording timer
+                recordingTimer = setInterval(updateRecordingTime, 1000);
+                
+                addMessage('Recording started', 'success');
+                
+            } catch (error) {
+                addMessage(`Failed to start recording: ${error}`, 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
+                isRecording = false;
+                
+                // Update UI
+                startRecordingBtn.disabled = false;
+                stopRecordingBtn.disabled = true;
+                recordingStatus.style.display = 'none';
+                
+                // Clear timer
+                if (recordingTimer) {
+                    clearInterval(recordingTimer);
+                    recordingTimer = null;
+                }
+                
+                // Clean up audio context
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                    analyser = null;
+                }
+                
+                addMessage('Recording stopped, processing...', 'info');
+            }
+        }
+
+        function updateRecordingTime() {
+            if (recordingStartTime) {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                recordingTime.textContent = `${minutes}:${seconds}`;
+            }
+        }
+
+        async function uploadAudioBlob(blob) {
+            try {
+                const formData = new FormData();
+                formData.append('file', blob, 'recording.wav');
+                
+                queueStatus.textContent = '1 file processing';
+                
+                const response = await fetch('http://localhost:8000/classify_single', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                handleUploadResult(result);
+                
+            } catch (error) {
+                addMessage(`Upload failed: ${error}`, 'error');
+                queueStatus.textContent = '0 files';
+            }
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                queueStatus.textContent = '1 file processing';
+                addMessage(`Uploading ${file.name}...`, 'info');
+                
+                const response = await fetch('http://localhost:8000/classify_single', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                handleUploadResult(result);
+                
+            } catch (error) {
+                addMessage(`Upload failed: ${error}`, 'error');
+                queueStatus.textContent = '0 files';
+            }
+        }
+
+        function handleUploadResult(result) {
+            queueStatus.textContent = '0 files';
+            
+            if (result.success && result.classification && result.classification.success) {
+                const best = result.classification.best_result;
+                if (best) {
+                    lastPrediction.textContent = `${best.best_prediction} (${(best.best_confidence * 100).toFixed(1)}%)`;
+                    addMessage(`Classification complete: ${best.best_prediction} with ${(best.best_confidence * 100).toFixed(1)}% confidence`, 'success');
+                    displayPredictions(result.classification);
+                } else {
+                    addMessage('Classification completed but no best prediction found', 'info');
+                }
+            } else {
+                addMessage(`Classification failed: ${result.error || 'Unknown error'}`, 'error');
+            }
+        }
+
+        function displayPredictions(classification) {
+            let html = '';
+            
+            // Gunshot predictions
+            if (Object.keys(classification.gunshot_predictions).length > 0) {
+                Object.entries(classification.gunshot_predictions).forEach(([model, pred]) => {
+                    const isBest = classification.best_result?.best_model === model;
+                    html += `
+                        <div class="prediction-card ${isBest ? 'best' : ''}">
+                            <div class="prediction-title">
+                                🔫 ${model} ${isBest ? '👑' : ''}
+                            </div>
+                            <div><strong>${pred.prediction}</strong></div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${pred.confidence * 100}%"></div>
+                            </div>
+                            <div>${(pred.confidence * 100).toFixed(1)}% confidence</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Wildlife predictions
+            if (Object.keys(classification.wildlife_predictions).length > 0) {
+                Object.entries(classification.wildlife_predictions).forEach(([model, pred]) => {
+                    const isBest = classification.best_result?.best_model === model;
+                    html += `
+                        <div class="prediction-card ${isBest ? 'best' : ''}">
+                            <div class="prediction-title">
+                                🦎 ${model} ${isBest ? '👑' : ''}
+                            </div>
+                            <div><strong>${pred.prediction}</strong></div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${pred.confidence * 100}%"></div>
+                            </div>
+                            <div>${(pred.confidence * 100).toFixed(1)}% confidence</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            predictionDisplay.innerHTML = html;
+        }
+
+        function addMessage(text, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `<span class="timestamp">[${timestamp}]</span>${text}`;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+            
+            // Keep only last 50 messages
+            while (messages.children.length > 50) {
+                messages.removeChild(messages.firstChild);
+            }
+        }
+
+        // Periodic health checks
+        setInterval(checkServerHealth, 30000);
+    </script>
+</body>
+</html>
